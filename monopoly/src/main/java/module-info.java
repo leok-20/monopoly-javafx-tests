@@ -5,6 +5,8 @@ module cz.cvut.fel.pvj.nejedly.monopoly {
 
     exports cz.cvut.fel.pvj.nejedly.monopoly;
 
+    opens cz.cvut.fel.pvj.nejedly.monopoly.model to org.junit.platform.commons;
+
     opens images;
     opens sprites;
     opens stylesheets;
