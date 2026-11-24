@@ -1,5 +1,8 @@
 package cz.cvut.fel.pvj.nejedly.monopoly.model;
 
+import com.github.cliftonlabs.json_simple.JsonArray;
+import com.github.cliftonlabs.json_simple.JsonObject;
+import com.github.cliftonlabs.json_simple.Jsoner;
 import cz.cvut.fel.pvj.nejedly.monopoly.model.board.Board;
 import cz.cvut.fel.pvj.nejedly.monopoly.model.board.squares.Cards;
 import cz.cvut.fel.pvj.nejedly.monopoly.model.board.squares.Property;
@@ -12,14 +15,25 @@ import cz.cvut.fel.pvj.nejedly.monopoly.model.decks.cards.CardType;
 import cz.cvut.fel.pvj.nejedly.monopoly.model.decks.cards.ReceiveMoneyCard;
 import cz.cvut.fel.pvj.nejedly.monopoly.model.player.Player;
 import javafx.beans.property.SimpleBooleanProperty;
+import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -104,6 +118,48 @@ class GameModelTest {
         assertThrows(IllegalArgumentException.class, () -> newGame.startNewGame(7));
     }
 
+    // Saving/Loading a game preserves data for player and property ownership.
+    @Test
+    void saveAndLoadGame() throws Exception {
+        GameModel savedGame = new GameModel();
+        savedGame.startNewGame(2);
+        savedGame.getActivePlayerProperty().set(savedGame.getPlayers().get(1));
+        savedGame.getPlayers().get(0).purchaseSquare(savedGame.getBoard().getBoardSquares()[1]);
+
+        JsonArray players = new JsonArray();
+        for (Player player : savedGame.getPlayers()) players.add(player.toJsonObject());
+        JsonObject json = new JsonObject();
+        json.put("activePlayer", "Player 2");
+        json.put("players", players);
+
+        try (MockedConstruction<FileWriter> ignoredWriter = mockConstruction(FileWriter.class);
+             MockedConstruction<FileReader> ignoredReader = mockConstruction(FileReader.class);
+             MockedStatic<Jsoner> jsoner = mockStatic(Jsoner.class)) {
+            jsoner.when(() -> Jsoner.deserialize(any(Reader.class))).thenReturn(json);
+            savedGame.save();
+            GameModel loadedGame = GameModel.load();
+
+            assertSame(loadedGame.getPlayers().get(1), loadedGame.getActivePlayer());
+            assertSame(loadedGame.getPlayers().get(0),
+                ((Property) loadedGame.getBoard().getBoardSquares()[1]).getOwner());
+
+            json.put("activePlayer", "Unknown player");
+            assertNull(GameModel.load().getActivePlayer());
+        }
+    }
+
+    // Error caught and is logged/thrown.
+    @Test
+    void saveReportsExceptionFound() {
+        GameModel model = new GameModel();
+        model.startNewGame(2);
+        try (MockedConstruction<FileWriter> ignored = mockConstruction(FileWriter.class,
+            (writer, context) -> doThrow(new IOException()).when(writer).write(anyString()))) {
+            RuntimeException exception = assertThrows(RuntimeException.class, () -> model.save());
+            assertInstanceOf(IOException.class, exception.getCause());
+        }
+    }
+
     // Stepping on empty or owned property does not enforce rent.
     @Test
     void dontChargeRentForEmptyOrOwnedProperty() {
@@ -171,5 +227,21 @@ class GameModelTest {
         assertEquals(1600, player.getMoney().get());
         assertSame(chestCard, model.steppedOnCards(new Cards("Community Chest", 2, CardType.COMMUNITY_CHEST), player));
         assertEquals(1650, player.getMoney().get());
+
+        Card otherCard = new Card(CardType.CHANCE, "No effect");
+        when(board.getChanceDeck()).thenReturn(new ChanceDeck(new Card[]{otherCard}));
+        assertSame(otherCard, model.steppedOnCards(new Cards("Chance", 7, CardType.CHANCE), player));
+        assertEquals(1650, player.getMoney().get());
+    }
+
+    // Unsupported card types should throw an exception when landing.
+    @Test
+    void handlesUnsupportedCard() {
+        GameModel model = new GameModel();
+        Player player = new Player("Alex", "car.png");
+        Cards cards = mock(Cards.class);
+        when(cards.getCardType()).thenReturn(CardType.COMMUNITY_CHEST, CardType.CHANCE);
+
+        assertThrows(NullPointerException.class, () -> model.steppedOnCards(cards, player));
     }
 }

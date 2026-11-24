@@ -6,12 +6,15 @@ import cz.cvut.fel.pvj.nejedly.monopoly.model.board.squares.Property;
 import cz.cvut.fel.pvj.nejedly.monopoly.model.board.squares.PropertyGroup;
 import cz.cvut.fel.pvj.nejedly.monopoly.model.board.squares.Utility;
 import cz.cvut.fel.pvj.nejedly.monopoly.view.GameView;
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -76,6 +79,24 @@ class GameViewTest {
             assertEquals(List.of("roll", "end", "purchase", "sell", "save"), controller.actions);
             assertSame(gameView.getScene(), controller.endedScene);
             assertSame(gameView.getScene(), controller.savedScene);
+        });
+    }
+
+    // Selling property dialog is able to be displayed/dismissed.
+    @Test
+    void displaySellPropertyDialog() {
+        FxTestSupport.runOnFxThread(() -> {
+            List<Window> existingWindows = new ArrayList<>(Window.getWindows());
+            Platform.runLater(() -> {
+                for (Window window : Window.getWindows()) {
+                    if (!existingWindows.contains(window) && window.isShowing()) {
+                        window.hide();
+                    }
+                }
+            });
+
+            GameView gameView = new GameView(new GameModel(), new RecordingController());
+            gameView.showSellPropertyDialog(new ComboBox<>(), new Button("Sell property"));
         });
     }
 

@@ -250,6 +250,17 @@ class PlayerTest {
         assertEquals(50, player.getMoney().get());
     }
 
+    // Selling the final property for exactly the debt should NOT make the player go bankrupt...
+    @Test
+    void ensureNoBankruptWhenDebtIsCovered() {
+        Player player = new Player("Alex", 0, 0, false, false, FXCollections.observableArrayList(), 0);
+        Property property = new Property("Property", 1, null, 1, 200);
+        property.setOwner(player);
+        player.getOwnedSquares().add(property);
+        player.changeMoneyBalanceBy(-200);
+        assertFalse(player.isBankrupt().get());
+    }
+
     // A player becomes bankrupt when selling all property still cannot cover a debt.
     @Test
     void becomesBankruptWhenPropertyCannotCoverDebt() {

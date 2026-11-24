@@ -66,6 +66,7 @@ class SquaresTest {
 
         railroads[0].setOwner(owner);
         owner.getOwnedSquares().add(railroads[0]);
+        assertSame(owner, railroads[0].getOwner());
         assertEquals(25, railroads[0].getRent());
         assertTrue(railroads[0].toString().contains("Owner: Alex"));
 
